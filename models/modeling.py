@@ -1,142 +1,134 @@
-import argparse
-from pathlib import Path
+"""
+Machine Learning model training for CrimeHotspotSim
+Author: Emmanuel Bautista
 
-import joblib
+This script:
+1. Loads the processed dataset (frames.csv).
+2. Builds a binary hotspot label (top 20% by weekly crime count).
+3. Trains a GradientBoostingClassifier (simple but strong baseline).
+4. Scores the latest week BEFORE intervention.
+5. Simulates an intervention (add 10 patrol cars, +5% pedestrian activity)
+   and re-scores AFTER intervention.
+6. Saves:
+   - baseline_ml.pkl (trained model)
+   - latest_scores_before.csv
+   - latest_scores_after.csv
+"""
+
+import argparse
 import pandas as pd
+from pathlib import Path
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import average_precision_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import average_precision_score
+import joblib
 
+def main(frames_csv, models_dir, pred_dir):
 
-def train_ml(frames_csv: str, models_dir: str, pred_dir: str):
-    """
-    Train a simple ML hotspot model and generate scores for the latest week.
-    """
-
-    # 1. Load the preprocessed panel data
+    # ---------------------------------------------------------------
+    # 1. Load processed weekly dataset
+    # ---------------------------------------------------------------
     panel = pd.read_csv(frames_csv, parse_dates=["week_start"])
 
-
-    # 2. Define a binary "hotspot" label
+    # ---------------------------------------------------------------
+    # 2. Define binary hotspot label:
+    # hotspot = 1 if crime_count >= 80th percentile overall
+    # ---------------------------------------------------------------
     q80 = panel["crime_count"].quantile(0.8)
     panel["hotspot"] = (panel["crime_count"] >= q80).astype(int)
 
-    # Feature columns we will use in the model.
-    # Right now, lags + simple placeholders.
-    feature_cols = [
-        "lag1",
-        "lag2",
-        "lag3",
-        "poi_density",
-        "nightlight",
-        "income",
-        "pop_density",
-        "weather_temp",
-        "events_count",
-        "patrol_cars",
-        "ped_activity",
+    # Model features
+    features = [
+        "lag1", "lag2", "lag3",
+        "poi_density", "nightlight", "income",
+        "pop_density", "weather_temp", "events_count",
+        "patrol_cars", "ped_activity"
     ]
 
-    # Identify the most recent week for inference.
+    # Latest week is used ONLY for inference, not training
     latest_week = panel["week_start"].max()
 
-    # 3. Train/validation split (time-aware)
-    train_df = panel[panel["week_start"] < latest_week].copy()
-    val_df = panel[
-        panel["week_start"] >= latest_week - pd.Timedelta(days=28)
-    ].copy()
 
-    X_train = train_df[feature_cols]
-    y_train = train_df["hotspot"]
-    X_val = val_df[feature_cols]
-    y_val = val_df["hotspot"]
+    # ---------------------------------------------------------------
+    # 3. Split training / validation (avoid leakage!)
+    # ---------------------------------------------------------------
+    train_df = panel[panel["week_start"] < latest_week]
+    val_df = panel[panel["week_start"] >= latest_week - pd.Timedelta(days=28)]
 
-    # 4. Build and train the model
-    # Using a simple pipeline:
-    #  - StandardScaler: normalize features
-    #  - GradientBoostingClassifier: tree-based model for classification
-    pipe = Pipeline(
-        [
-            ("scaler", StandardScaler()),
-            ("clf", GradientBoostingClassifier(random_state=42)),
-        ]
-    )
+    X_train, y_train = train_df[features], train_df["hotspot"]
+    X_val, y_val = val_df[features], val_df["hotspot"]
 
+
+    # ---------------------------------------------------------------
+    # 4. Build ML pipeline (scaler + gradient boosting)
+    # ---------------------------------------------------------------
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", GradientBoostingClassifier(random_state=42))
+    ])
+
+    # Train model
     pipe.fit(X_train, y_train)
 
-    # 5. Evaluate using Average Precision (PR-AUC)
+    # Quick validation metric (PR-AUC)
     val_pred = pipe.predict_proba(X_val)[:, 1]
     ap = average_precision_score(y_val, val_pred)
+    print(f"Validation AP: {ap:.4f}")
 
-    # 6. Save the trained model
+
+    # ---------------------------------------------------------------
+    # 5. Save trained model
+    # ---------------------------------------------------------------
     models_path = Path(models_dir)
     models_path.mkdir(parents=True, exist_ok=True)
     model_path = models_path / "baseline_ml.pkl"
     joblib.dump(pipe, model_path)
 
-    # 7. Score the latest week (BEFORE intervention)
-    latest_df = panel[panel["week_start"] == latest_week].copy()
-    latest_df["score_before"] = pipe.predict_proba(
-        latest_df[feature_cols]
-    )[:, 1]
 
-    # 8. Apply a simple intervention and re-score (AFTER)
+    # ---------------------------------------------------------------
+    # 6. Score latest week BEFORE intervention
+    # ---------------------------------------------------------------
+    latest_df = panel[panel["week_start"] == latest_week].copy()
+    latest_df["score_before"] = pipe.predict_proba(latest_df[features])[:, 1]
+
+
+    # ---------------------------------------------------------------
+    # 7. Apply simple intervention (example)
+    # ---------------------------------------------------------------
     after_df = latest_df.copy()
 
-    # Example intervention: +10 patrol cars and +5% pedestrian activity
+    # Simulate "add 10 patrol units" (counterfactual)
     after_df["patrol_cars"] = after_df["patrol_cars"] + 10.0
+
+    # Simulate "+5% pedestrian activity"
     after_df["ped_activity"] = after_df["ped_activity"] * 1.05
 
-    after_df["score_after"] = pipe.predict_proba(
-        after_df[feature_cols]
-    )[:, 1]
+    # Re-predict AFTER intervention
+    after_df["score_after"] = pipe.predict_proba(after_df[features])[:, 1]
 
-    # ------------------------------------------------------
-    # 9. Save per-cell scores to CSV (for mapping)
-    # ------------------------------------------------------
+
+    # ---------------------------------------------------------------
+    # 8. Save predictions (for mapping in Kepler.gl or Folium)
+    # ---------------------------------------------------------------
     pred_path = Path(pred_dir)
     pred_path.mkdir(parents=True, exist_ok=True)
 
     before_csv = pred_path / "latest_scores_before.csv"
     after_csv = pred_path / "latest_scores_after.csv"
 
-    latest_df[
-        ["grid_id", "lat", "lon", "crime_count", "lag1", "lag2", "lag3", "score_before"]
-    ].to_csv(before_csv, index=False)
+    latest_df.to_csv(before_csv, index=False)
+    after_df.to_csv(after_csv, index=False)
 
-    after_df[
-        ["grid_id", "lat", "lon", "crime_count", "lag1", "lag2", "lag3", "score_after"]
-    ].to_csv(after_csv, index=False)
-
-    print(
-        {
-            "validation_AP": float(ap),
-            "model_path": str(model_path),
-            "before_csv": str(before_csv),
-            "after_csv": str(after_csv),
-            "latest_week": str(latest_week.date()),
-        }
-    )
+    print(f"Saved predictions:\n- {before_csv}\n- {after_csv}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--frames",
-        default="data/processed/frames.csv",
-        help="Path to preprocessed panel CSV",
-    )
-    parser.add_argument(
-        "--models_dir",
-        default="models",
-        help="Directory to save trained models",
-    )
-    parser.add_argument(
-        "--pred_dir",
-        default="predictions",
-        help="Directory to save per-cell scores",
-    )
+    parser.add_argument("--frames", required=True,
+                        help="Path to processed frames.csv")
+    parser.add_argument("--models_dir", default="models")
+    parser.add_argument("--pred_dir", default="predictions")
     args = parser.parse_args()
 
-    train_ml(args.frames, args.models_dir, args.pred_dir)
+    main(args.frames, args.models_dir, args.pred_dir)
