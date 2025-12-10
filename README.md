@@ -1,23 +1,38 @@
 # CrimeHotspotSim 🔍🗺️
-A spatio-temporal hotspot mapping tool that forecasts where crime is most likely to occur in Los Angeles and simulates the impact of preventative interventions.
-
----
+A spatio-temporal hotspot forecasting and simulation tool that predicts weekly crime risk in Cleveland, Ohio, and models how interventions—such as increased police patrols or pedestrian activity—may reshape future hotspot patterns.
 
 ## Overview
-CrimeHotspotSim is a research-driven project that leverages crime data (2020–present) to predict high-risk areas in Los Angeles.
-The project’s main contribution is the ability to **simulate interventions** (for example, adding 10 patrol cars to a grid, or increasing pedestrian activity by 5%) and generate **counterfactual hotspot maps** that estimate how predicted crime risk shifts under different scenarios.
+CrimeHotspotSim is a research-driven project that leverages Cleveland’s open crime API (2016–present), along with Census demographics, environmental data (temperature), and satellite nightlight imagery, to forecast crime hotspots at a 0.5 km × 0.5 km grid resolution.
+The project’s main contribution is the ability to **simulate interventions** and generate **counterfactual hotspot maps** that estimate how predicted crime risk shifts under different scenarios. 
 
-This approach provides policymakers, law enforcement, and researchers with a way to explore strategies virtually before implementing them in real life.
+Examples include:
+- Increasing pedestrian activity by 30%
+- Increasing police patrol presence in hotspot areas by 40%
+- Testing combined interventions to visualize shifts in spatial crime risk
+
+This approach provides **policymakers**, **law enforcement**, and **researchers** with a way to explore strategies virtually before committing real-world resources.
 
 ---
 
 ## Features
-- Preprocess large-scale crime datasets for analysis and modeling.
-- Categorize raw crime descriptions into standardized groups (e.g., THEFT, ASSAULT, FRAUD).
-- Engineer **spatio-temporal features** (Year, Month, Hour, DayOfWeek).
-- Visualize hotspots on an **interactive Los Angeles map** using Folium.
-- Simulate preventative interventions (patrol allocation, pedestrian activity).
-- Export cleaned datasets for further modeling or research.
+- **Full preprocessing pipeline** for Cleveland crime data via ArcGIS FeatureServer
+(timestamp cleaning, invalid coordinate removal, district filtering, 2016+ records).
+- **Spatial gridding** into 0.5 km cells and **weekly temporal aggregation**.
+- **Spatio-temporal feature engineering**, including:
+  - Lag features (lag1, lag2, lag3)
+  - Spatial neighbor features (1-week, 4-week, 8-week averages)
+  - ACS Census demographics (income, poverty, unemployment)
+  - Environmental features (temperature, nightlight)
+- **Machine learning forecasting models**:
+  - GradientBoostingClassifier 
+  - XGBoostClassifier 
+- **Counterfactual intervention simulator**, supporting:
+  - Pedestrian activity increases/decreases 
+  - Police patrol adjustments for hotspot vs. non-hotspot grids 
+- **Exportable predictions**, including:
+  - Baseline hotspot probabilities 
+  - Post-intervention adjusted risk maps 
+- Processed datasets for downstream analysis, modeling, or visualization (e.g., Kepler.gl, Folium, GIS workflows).
 
 ---
 
@@ -68,17 +83,67 @@ source .venv/bin/activate      # On Mac/Linux
 # Install dependencies
 pip install -r requirements.txt
 ```
-## Usage
-1. Place the raw dataset (`crime.csv`) into `data/raw/`.
-2. Open JupyterLab:
-   ```bash
-   jupyter lab
-
-Run the notebooks in order:
-preprocessing.ipynb → cleans data and creates processed parquet file.
-hotspot_mapping.ipynb → generates LA crime hotspot visualizations.
-simulation.ipynb → runs counterfactual experiments (e.g., add patrols).
-Check visualizations/ for exported maps (.html) you can open in a browser.
-
 
 ---
+
+## Usage
+
+### 1. Prepare the data directory
+Place the required raw data files into the project structure:
+
+```
+data/ 
+ ├── raw/
+ │    ├── temperature.csv          # Daily temperature data (NOAA or equivalent)
+ │    └── (automatically pulls Cleveland crime data via API)
+ ├── external/
+ │    └── night_light.tif          # (Optional) VIIRS nightlight raster
+ └── processed/
+      (will be created automatically)
+```
+
+---
+
+### 2. Run the preprocessing pipeline
+This fetches Cleveland crime data from the ArcGIS API, builds the spatial grid,
+aggregates by week, creates lag + neighbor features, joins Census demographics,
+and outputs the core modeling datasets.
+
+```bash
+python src/preprocessing.py --outdir data/processed
+```
+
+---
+
+### 3. Train a baseline Gradient Boosting model
+
+This trains a hotspot classifier, prints validation metrics + feature importances,
+and generates before/after intervention predictions.
+
+```bash
+python models/modeling.py --frames data/processed/frames.csv --models_dir models --pred_dir predictions
+```
+
+---
+
+### 4. Train the XGBoost model (optional, more performant)
+
+This creates the XGBoost baseline model and runs the same intervention simulation.
+
+```bash
+python models/xgboost_modeling.py --frames data/processed/frames.csv --models_dir models --pred_dir predictions
+```
+
+---
+
+### 5. Visualize results (Kepler.gl, Folium, GIS tools)
+
+You can load:
+- latest_scores_before.csv
+- latest_scores_after.csv
+- xgb_latest_scores_after.csv 
+
+into Kepler.gl, QGIS, or any GIS/mapping tool to visualize:
+- Predicted hotspot probabilities 
+- How risk shifts after interventions 
+- Spatial cluster patterns and temporal changes
