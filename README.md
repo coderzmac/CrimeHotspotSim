@@ -49,6 +49,9 @@ CrimeHotspotSim/
 ├── src/ # Python source code
 │ └── preprocessing.py # Cleaning & feature engineering
 │
+├── scripts
+│ └── visualize_hotspots.py #generates interactive folium maps, exports them as html files for visualization
+│
 ├── models/ # Machine learning training and trained files
 │ ├── modeling.py # Training & evaluation using GradientBoostingClassifier
 │ ├── xgboost_modeling.py # Training & evaluation using XGBoostingClassifier
@@ -59,6 +62,8 @@ CrimeHotspotSim/
 │ ├── latest_scores_after.csv # Provides features and risk score before model alterations
 │ ├── latest_scores_before.csv # Altered features and risk score after GradientBoostingClassifier
 │ └── xgboost_latest_scores_after.csv # Altered features and risk score after XGBoostingClassifier
+│ └── crime_hotspot_comparison.html 
+│ 
 │
 ├── .gitignore # Ensures raw data is not uploaded to GitHub
 ├── requirements.txt # Python dependencies
@@ -136,14 +141,17 @@ python models/xgboost_modeling.py --frames data/processed/frames.csv --models_di
 
 ---
 
-### 5. Visualize results (Kepler.gl, Folium, GIS tools)
+### 5. Visualize results (hotspot predictions) with Folium maps
 
-You can load:
-- latest_scores_before.csv
-- latest_scores_after.csv
-- xgb_latest_scores_after.csv 
+Generates interactive maps of baseline and post-intervention risk scores. Outputs:
+- predictions/map_before.html #baseline risk
+- predictions/map_after.html  # post-intervention risk
+- predictions/crime_hotspot_comparison.html #side by side comparison
 
-into Kepler.gl, QGIS, or any GIS/mapping tool to visualize:
-- Predicted hotspot probabilities 
-- How risk shifts after interventions 
-- Spatial cluster patterns and temporal changes
+Run the visualization script:
+python scripts/visualize_hotspots.py
+
+Open the maps in a browser: #can view the maps locally by starting a simple HTTP server from the project root:
+python -m http.server 8000
+
+Then open: http://localhost:8000/predictions/crime_hotspot_comparison.html
