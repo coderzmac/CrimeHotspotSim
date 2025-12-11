@@ -5,3 +5,7 @@ rasterio
 scikit-learn
 joblib
 xgboost
+folium
+geopandas
+shapely
+jinja2
