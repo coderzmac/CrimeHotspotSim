@@ -18,7 +18,7 @@ This script:
 
 import argparse
 import pandas as pd
-import numpy as np  # added for intervention calculations
+import numpy as np
 from pathlib import Path
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.pipeline import Pipeline

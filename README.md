@@ -39,35 +39,38 @@ This approach provides **policymakers**, **law enforcement**, and **researchers*
 ## Project Structure
 
 ```
+Project Structure
+
 CrimeHotspotSim/
 │
-├── data/ # Raw & processed datasets (ignored in Git)
-│ ├── external/ # Place light pollution file here (e.g., night_light.tif)
-│ ├── raw/ # Place original CSVs here (e.g., temperature.csv)
-│ └── processed/ # Outputs after preprocessing (e.g., frames.csv, inference_frame.csv)
+├── data/                                       # Raw & processed datasets (ignored in Git)
+│ ├── external/                                 # Place light pollution file here (e.g., night_light.tif)
+│ ├── raw/                                      # Place original CSVs here (e.g., temperature.csv)
+│ └── processed/                                # Outputs after preprocessing (e.g., frames.csv, inference_frame.csv)
 │
-├── src/ # Python source code
-│ └── preprocessing.py # Cleaning & feature engineering
+├── src/                                        # Python source code
+│ └── preprocessing.py                          # Cleaning & feature engineering
 │
 ├── scripts
-│ └── visualize_hotspots.py #generates interactive folium maps, exports them as html files for visualization
+│ └── visualize_hotspots.py                     #generates interactive folium maps, exports them as html files for visualization
 │
-├── models/ # Machine learning training and trained files
-│ ├── modeling.py # Training & evaluation using GradientBoostingClassifier
-│ ├── xgboost_modeling.py # Training & evaluation using XGBoostingClassifier
-│ ├── baseline_ml.pkl # Trained GradientBoostingClassifier model
-│ └── xgboost_modeling.py # Trained XGBoostingClassifier model
+├── models/                                     # Machine learning training and trained files
+│ ├── modeling.py                               # Training & evaluation using GradientBoostingClassifier
+│ ├── xgboost_modeling.py                       # Training & evaluation using XGBoostingClassifier
+│ ├── baseline_ml.pkl                           # Trained GradientBoostingClassifier model
+│ └── xgboost_modeling.py                       # Trained XGBoostingClassifier model
 │
-├── predictions/ # Csv files from ml models before and after risk scores are altered e
-│ ├── latest_scores_after.csv # Provides features and risk score before model alterations
-│ ├── latest_scores_before.csv # Altered features and risk score after GradientBoostingClassifier
-│ └── xgboost_latest_scores_after.csv # Altered features and risk score after XGBoostingClassifier
+├── predictions/                                # Csv files from ml models before and after risk scores are altered e
+│ ├── latest_scores_after.csv                   # Provides features and risk score before model alterations
+│ ├── latest_scores_before.csv                  # Altered features and risk score after GradientBoostingClassifier
+│ └── xgboost_latest_scores_after.csv           # Altered features and risk score after XGBoostingClassifier
 │ └── crime_hotspot_comparison.html 
 │ 
 │
-├── .gitignore # Ensures raw data is not uploaded to GitHub
-├── requirements.txt # Python dependencies
-└── README.md # Project documentation
+├── .gitignore          # Ensures raw data is not uploaded to GitHub
+├── requirements.txt    # Python dependencies
+└── README.md           # Project documentation
+
 
 ```
 
